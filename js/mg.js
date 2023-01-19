@@ -25,19 +25,20 @@ function MG(ob, w, h) {
 	this.mark_history = false;	// 是否将走过的格子用红色标出
 	this.mark_history2 = false;	// 是否标出最短路径，暂时没有用
 	this.chkCanvasTagSupport();	// 检查是否支持Canvas标签
+	this.is_mine = false;
 }
-function sendPost() {
+function serverCreateMaze(w, h) {
 	var data = {};
-	
-	data.userId = '1';
-	data.width = 5;
-	data.height = 5;
 
-	return new Promise((resolve,reject)=>{
+	data.userId = '1';
+	data.width = w;
+	data.height = h;
+
+	return new Promise((resolve, reject) => {
 		$.ajax({
 			url: 'http://localhost:8080/init',
 			type: 'post',
-			contentType : 'application/json;charset=UTF-8',
+			contentType: 'application/json;charset=UTF-8',
 			data: JSON.stringify(data),
 			datatype: "json",//"xml", "html", "script", "json", "jsonp", "text".           
 			success: function (data) {
@@ -47,28 +48,30 @@ function sendPost() {
 			}
 		});
 	})
-	
+
+}
+function serverMove(d) {
+	var data = {};
+
+	data.userId = '1';
+	data.direction = d;
+	return new Promise((resolve, reject) => {
+		$.ajax({
+			url: 'http://localhost:8080/move',
+			type: 'post',
+			contentType: 'application/json;charset=UTF-8',
+			data: JSON.stringify(data),
+			datatype: "json",//"xml", "html", "script", "json", "jsonp", "text".           
+			success: function (data) {
+				resolve(data)
+				// console.log(data.mg.grids);
+				// return data.mg.grids;
+			}
+		});
+	})
 }
 MG.prototype = {
-	// sendPost: function () {
-	// 	var data = {};
-        
-    //     data.userId = '1';
-    //     data.width = 5;
-	// 	data.height = 5;
-	// 	$.ajax({
-	// 		url: 'http://localhost:8080/init',
-	// 		type: 'post',
-	// 		contentType : 'application/json;charset=UTF-8',
-	// 		data: JSON.stringify(data),
-	// 		datatype: "json",//"xml", "html", "script", "json", "jsonp", "text".           
-	// 		success: function (data) {
-	// 			console.log(data);
-	// 			this.grids = data.mg.grids;
 	
-	// 		}
-	// 	});
-	// },
 	init: function () {
 		// 初始化迷宫地图
 		var x, y;
@@ -91,162 +94,10 @@ MG.prototype = {
 		return this;
 	},
 	create: async function () {
-		// 秘生成迷宫 
-		// TODO: 通知服务端，设置迷宫
-		// var t1, t0 = (new Date()).getTime();
-		// this.init();
-		// this._walk(Math.floor(Math.random() * this.grids.length));
-		// t1 = (new Date()).getTime();
-		// if (typeof console != "undefined") {
-		// 	console.log("耗时: " + (t1 - t0) + "ms");
-		// }
-		
-		 
-		this.grids  =  await sendPost();
-	
+
+		this.grids = await serverCreateMaze(this.w, this.h);
+
 		return this;
-	},
-	_walk: function (startPos) {
-		// 从startPos开始，遍历地图
-		this._walk_history = [];
-		this._walk_history2 = [];
-		var current_pos = startPos;
-		while (this._getNext0() != -1) {
-			// 当还有格子未到达过
-			current_pos = this._step(current_pos);
-			if (typeof (current_pos) != "number") break;
-		}
-		return this;
-	},
-	_getTargetSteps: function (current_pos) {
-		// 得到当前格子上、下、左、右四个相邻格子中未到达过且可在下一次遍历到达的格子，
-		// 可到达写入相应格子的位置，不可到达写入-1
-		// 结果以数组形式返回。
-		var p = 0,
-			a = [];
-
-		// 判断当前格子上方的格子是否可在下一次遍历到达
-		p = current_pos - this.w;
-		if (p > 0 && !this.grids[p] && !this._isRepeating(p))
-			a.push(p);
-		else
-			a.push(-1);
-
-		// 判断当前格子右方的格子是否可在下一次遍历到达
-		p = current_pos + 1;
-		if (p % this.w != 0 && !this.grids[p] && !this._isRepeating(p))
-			a.push(p);
-		else
-			a.push(-1);
-
-		// 判断当前格子下方的格子是否可在下一次遍历到达
-		p = current_pos + this.w;
-		if (p < this.grids.length && !this.grids[p] && !this._isRepeating(p))
-			a.push(p);
-		else
-			a.push(-1);
-
-		// 判断当前格子左方的格子是否可在下一次遍历到达
-		p = current_pos - 1;
-		if (current_pos % this.w != 0 && !this.grids[p] && !this._isRepeating(p))
-			a.push(p);
-		else
-			a.push(-1);
-
-		return a;
-	},
-	_noStep: function () {
-		// 判断当前格子是否有可到达的邻格
-		for (var i = 0; i < this._target_steps.length; i++)
-			if (this._target_steps[i] != -1)
-				return false;
-		return true;
-	},
-	_step: function (current_pos) {
-		// 从当前格子随机行走一步（拿到十足）
-		this._target_steps = this._getTargetSteps(current_pos);
-		if (this._noStep()) {
-			// 如果当前格子的所有邻居都无法到达，
-			// 返回历史记录中的上一级
-			var tmp = this._walk_history.pop();
-			if (typeof (tmp) != "number") return false;
-			this._walk_history2.push(tmp);
-			return this._step(tmp);
-		}
-
-		var r = Math.floor(Math.random() * 4),
-			next_pos,
-			grids = this.grids;
-
-		while (this._target_steps[r] == -1) {
-			r = Math.floor(Math.random() * 4);
-		}
-		// 从当前格子可到达的领居中随机选取一个
-		next_pos = this._target_steps[r];
-
-		var is_cross = false;
-		// 判断当前格子是否与已走过的路线交叉
-		if (grids[next_pos])
-			is_cross = true;
-
-		switch (r) {
-			case 0:
-				// 如果是向上走
-				// 当前格子的顶边标记为可通过（标记为1）
-				// 下一格子的底边标记为可通过（标记为1）
-				grids[current_pos] ^= 1;
-				grids[next_pos] ^= 4;
-				break;
-			case 1:
-				// 如果是向右走
-				// 当前格子的右边标记为可通过（标记为1）
-				// 下一格子的左边标记为可通过（标记为1）
-				grids[current_pos] ^= 2;
-				grids[next_pos] ^= 8;
-				break;
-			case 2:
-				// 如果是向下走
-				// 当前格子的底边标记为可通过（标记为1）
-				// 下一格子的顶边标记为可通过（标记为1）
-				grids[current_pos] ^= 4;
-				grids[next_pos] ^= 1;
-				
-				break;
-			case 3:
-				// 如果是向左走
-				// 当前格子的左边标记为可通过（标记为1）
-				// 下一格子的右边标记为可通过（标记为1）
-				grids[current_pos] ^= 8;
-				grids[next_pos] ^= 2;
-				
-		}
-		// 将当前位置记入历史记录
-		this._walk_history.push(current_pos);
-
-		return is_cross ? false : next_pos;
-	},
-	_isRepeating: function (p) {
-		// 判断当前格子是否已走过
-		var i,
-			a = this._walk_history,
-			a2 = this._walk_history2,
-			l = a.length,
-			l2 = a2.length;
-		for (i = 0; i < l; i++) {
-			if (a[i] == p) return true;
-		}
-		for (i = 0; i < l2; i++) {
-			if (a2[i] == p) return true;
-		}
-		return false;
-	},
-	_getNext0: function () {
-		// 得到地图上下一个未到达的格子
-		for (var i = 0, l = this.grids.length; i <= l; i++) {
-			if (!this.grids[i])
-				return i;
-		}
-		return -1;
 	},
 	chkCanvasTagSupport: function () {
 		// 检查是否支持Canvas标签
@@ -260,7 +111,7 @@ MG.prototype = {
 			this.ob.removeChild(this.ob.childNodes[0]);
 		return this;
 	},
-	show:async function () {
+	show: async function () {
 		// 将迷宫从数据转化为DOM元素并显示在页面上
 		this.clear();
 		if (this.is_canvas_valid) {
@@ -411,7 +262,7 @@ function MG_Me(mg) {
 }
 
 MG_Me.prototype = {
-	init: function () {
+	init: function (mine) {
 		var tmp_ob = document.createElement("div"),
 			tmp_img = document.createElement("img"),
 			tmp_info = document.createElement("div"),
@@ -432,23 +283,25 @@ MG_Me.prototype = {
 		tmp_ob.style.height = this.mg.grid_size + "px";
 		this.ob = tmp_ob;
 		this.mg.ob.appendChild(this.ob);
-
-		$.hotkeys.add("up", function () {
-			_this.move(0);
-		});
-		$.hotkeys.add("right", function () {
-			_this.move(1);
-		});
-		$.hotkeys.add("down", function () {
-			_this.move(2);
-		});
-		$.hotkeys.add("left", function () {
-			_this.move(3);
-		});
-		setTimeout(function () {
-			if (_this.mg.is_moved) return;
-			_this.inform(SANSI_TOY_MSG.keyboard_hint);
-		}, 3000);
+		this.is_mine = mine;
+		if (this.mg.is_mine) {
+			$.hotkeys.add("up", function () {
+				_this.move(0);
+			});
+			$.hotkeys.add("right", function () {
+				_this.move(1);
+			});
+			$.hotkeys.add("down", function () {
+				_this.move(2);
+			});
+			$.hotkeys.add("left", function () {
+				_this.move(3);
+			});
+			setTimeout(function () {
+				if (_this.mg.is_moved) return;
+				_this.inform(SANSI_TOY_MSG.keyboard_hint);
+			}, 3000);
+		}
 
 		this.itvl = setInterval(function () {
 			if (!_this.mg.is_moved) return;
@@ -463,6 +316,8 @@ MG_Me.prototype = {
 		//this.setMark(2, this.mg.mark_history2);
 	},
 	move: function (d) {
+		answerMove(d);
+		// serverMove(d);
 		if (this.is_moving || this.finished) return;
 		this.mg.is_moved = true;
 		var v = this.mg.grids[this.pos];

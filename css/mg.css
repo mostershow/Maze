@@ -28,6 +28,7 @@ text-decoration: none;
 text-align: center;
 }
 .mg {
+    margin-top: 20px;
 font-size: 12px;
 border: solid 2px #666;
 position: relative;
