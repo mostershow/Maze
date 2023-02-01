@@ -26,17 +26,19 @@ function MG(ob, w, h) {
 	this.mark_history2 = false;	// 是否标出最短路径，暂时没有用
 	this.chkCanvasTagSupport();	// 检查是否支持Canvas标签
 	this.is_mine = false;
+	
 }
-function serverCreateMaze(w, h) {
+function serverCreateMaze(w, h,userId,roomId) {
 	var data = {};
 
-	data.userId = '1';
+	data.userId = userId;
+	data.roomId = roomId;
 	data.width = w;
 	data.height = h;
 
 	return new Promise((resolve, reject) => {
 		$.ajax({
-			url: 'http://localhost:8080/init',
+			url: 'http://127.0.0.1:8080/init',
 			type: 'post',
 			contentType: 'application/json;charset=UTF-8',
 			data: JSON.stringify(data),
@@ -57,7 +59,7 @@ function serverMove(d) {
 	data.direction = d;
 	return new Promise((resolve, reject) => {
 		$.ajax({
-			url: 'http://localhost:8080/move',
+			url: 'http://127.0.0.1:8080/move',
 			type: 'post',
 			contentType: 'application/json;charset=UTF-8',
 			data: JSON.stringify(data),
@@ -69,6 +71,14 @@ function serverMove(d) {
 			}
 		});
 	})
+}
+function randomString(e) {    
+    e = e || 32;
+    var t = "ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678",
+    a = t.length,
+    n = "";
+    for (i = 0; i < e; i++) n += t.charAt(Math.floor(Math.random() * a));
+    return n
 }
 MG.prototype = {
 	
@@ -91,12 +101,12 @@ MG.prototype = {
 		// 设置迷宫的宽度与高度
 		if (sets.width) this.w = sets.width;
 		if (sets.height) this.h = sets.height;
+		this.userId = sets.userId;
+		this.roomId = sets.roomId;
 		return this;
 	},
 	create: async function () {
-
-		this.grids = await serverCreateMaze(this.w, this.h);
-
+		this.grids = await serverCreateMaze(this.w, this.h,this.userId,this.roomId);
 		return this;
 	},
 	chkCanvasTagSupport: function () {
@@ -316,7 +326,10 @@ MG_Me.prototype = {
 		//this.setMark(2, this.mg.mark_history2);
 	},
 	move: function (d) {
-		answerMove(d);
+		var data = {};
+		data.direction = d;
+		data.userId = this.mg.userId;
+		answerMove(data);
 		// serverMove(d);
 		if (this.is_moving || this.finished) return;
 		this.mg.is_moved = true;
